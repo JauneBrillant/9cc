@@ -25,9 +25,18 @@ struct Token {
 // 現在着目しているトークン
 Token *token;
 
-void error(char *fmt, ...) {
-    va_list ap;         // 可変長引数を格納する変数apの宣言
-    va_start(ap, fmt);  // 初期化、可変長引数の先頭に移動
+// 入力プログラム
+char *user_input;
+
+// エラー箇所を報告する
+void error_at(char *loc, char *fmt, ...) {
+    va_list ap;  // 可変長引数のリストを指すポインタ -> argument pointer
+    va_start(ap, fmt);
+
+    int width = loc - user_input;
+    fprintf(stderr, "%s\n", user_input);
+    fprintf(stderr, "%*s", width, "");  // widthの幅分空白を出力
+    fprintf(stderr, "^ ");
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     exit(1);
@@ -43,14 +52,14 @@ bool consume(char op) {
 
 void expect(char op) {
     if (token->kind != TK_RESERVED || token->str[0] != op) {
-        error("'%c'ではありません", op);
+        error_at(token->str, "expected '%c'", op);
     }
     token = token->next;
 }
 
 int expect_number() {
     if (token->kind != TK_NUM) {
-        error("数ではありません");
+        error_at(token->str, "expected a number");
     }
     int val = token->val;
     token = token->next;
@@ -60,8 +69,8 @@ int expect_number() {
 bool at_eof() { return token->kind == TK_EOF; }
 
 Token *new_token(TokenKind kind, Token *cur, char *str) {
-    // calloc ->
-    // 指定されたサイズのメモリを動的に確保し、そのメモリの先頭アドレスを返す
+    // calloc
+    // ->指定されたサイズのメモリを動的に確保し、そのメモリの先頭アドレスを返す
     Token *tok = calloc(1, sizeof(Token));
     tok->kind = kind;
     tok->str = str;
@@ -69,7 +78,8 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
     return tok;
 }
 
-Token *tokenize(char *p) {
+Token *tokenize() {
+    char *p = user_input;
     Token head;
     head.next = NULL;
     Token *cur = &head;
@@ -92,7 +102,7 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        error("トークナイズできません");
+        error_at(p, "expected a number");
     }
 
     new_token(TK_EOF, cur, p);
@@ -101,11 +111,12 @@ Token *tokenize(char *p) {
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        error("引数の個数が正しくありません");
+        error_at(NULL, "引数の個数が正しくありません");
         return 1;
     }
 
-    token = tokenize(argv[1]);
+    user_input = argv[1];
+    token = tokenize();
 
     printf(".intel_syntax noprefix\n");
     printf(".globl main\n");
